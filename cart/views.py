@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .serializers import UserSerializer
-
+from .pagination import CustomPagination
 
 
 class RegisterView(APIView):
@@ -37,7 +37,7 @@ class LoginView(APIView):
                 return Response({
                     "refresh": str(refresh),
                     "access": str(refresh.access_token),
-                    "email": user.email
+                    "user": serializer.data
                 }, status=status.HTTP_200_OK)
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -49,6 +49,8 @@ class UserListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        users = CustomUser.objects.all()  # Fetch all users
-        serializer = UserSerializer(users, many=True)  # Serialize users
-        return Response(serializer.data, status=200)
+        users = CustomUser.objects.all()
+        paginator = CustomPagination()
+        paginated_users = paginator.paginate_queryset(users, request)  # Apply pagination
+        serializer = UserSerializer(paginated_users, many=True)
+        return paginator.get_paginated_response(serializer.data)
