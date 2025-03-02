@@ -24,10 +24,16 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(email=data['email'], password=data['password'])
+        user = authenticate(email=data["email"], password=data["password"])
         if not user:
             raise serializers.ValidationError("Invalid email or password")
-        return user
+
+        # Return a dictionary with user instance and email
+        return {
+            "user": user,
+            "email": data["email"],  # Retaining the original email
+            "password": data["password"]
+        }
 
 
 class UserSerializer(serializers.ModelSerializer):
