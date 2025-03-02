@@ -1,3 +1,4 @@
+from django.core.paginator import PageNotAnInteger, EmptyPage, Paginator
 from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -8,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .serializers import UserSerializer
-from .pagination import CustomPagination
+from .pagination import  responsedata, paginate
 
 
 class RegisterView(APIView):
@@ -45,12 +46,42 @@ class LoginView(APIView):
 
 
 class UserListView(APIView):
-    authentication_classes = [JWTAuthentication]  # Explicitly setting JWT Authentication
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        users = CustomUser.objects.all()
-        paginator = CustomPagination()
-        paginated_users = paginator.paginate_queryset(users, request)  # Apply pagination
+        users = CustomUser.objects.all().order_by("id")  # Ensure ordered queryset
+
+        if not users.exists():
+            return Response(
+                responsedata(status=status.HTTP_404_NOT_FOUND, message="No users found", data=[]),
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Apply Django's built-in pagination
+        page = request.GET.get("page", 1)
+        page_size = request.GET.get("page_size", 10)
+        paginator = Paginator(users, page_size)
+
+        try:
+            paginated_users = paginator.page(page)
+        except PageNotAnInteger:
+            paginated_users = paginator.page(1)
+        except EmptyPage:
+            return Response(
+                responsedata(status=status.HTTP_404_NOT_FOUND, message="Page not found", data=[]),
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Serialize paginated data
         serializer = UserSerializer(paginated_users, many=True)
-        return paginator.get_paginated_response(serializer.data)
+
+        # Use paginate function for pagination metadata
+        pagination_data = paginate(serializer.data, paginator, page)
+
+        return Response(
+            responsedata(status=status.HTTP_200_OK, message="Users retrieved successfully", data=pagination_data),
+            status=status.HTTP_200_OK
+        )
+
+
